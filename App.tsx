@@ -86,11 +86,14 @@ const App: React.FC = () => {
   useEffect(() => {
     const initApp = async () => {
       try {
-        // 1. Fetch default configuration
-        const response = await fetch('default_model.json');
-        if (!response.ok) throw new Error('Failed to load default_model.json');
-        
+        // 1. Fetch default configuration from static assets
+        // This bypasses module resolution issues (@/ vs ./)
+        const response = await fetch('./default_model.json');
+        if (!response.ok) {
+           throw new Error('Could not load default model config');
+        }
         const data = await response.json();
+        
         // Normalize default URL immediately to match loadModel behavior
         const defUrl = data.model_url.endsWith('/') ? data.model_url : `${data.model_url}/`;
         const defDesc = data.model_description;
@@ -111,7 +114,8 @@ const App: React.FC = () => {
 
       } catch (err) {
         console.error("Initialization error:", err);
-        setModelStatus('failed');
+        // Fallback or just stay idle if config fails
+        setModelStatus('idle'); 
       }
     };
 
