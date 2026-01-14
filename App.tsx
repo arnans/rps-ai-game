@@ -14,7 +14,14 @@ import {
 
 const App: React.FC = () => {
   // --- State ---
-  const [modelUrl, setModelUrl] = useState<string>(() => localStorage.getItem(STORAGE_KEY_URL) || '');
+  // modelUrl is the text in the input box
+  const [modelUrl, setModelUrl] = useState<string>('');
+  
+  // loadedModelUrl tracks the actual model currently active in the game
+  const [loadedModelUrl, setLoadedModelUrl] = useState<string>('');
+  
+  const [defaultModelData, setDefaultModelData] = useState<{url: string, desc: string} | null>(null);
+
   const [mappings, setMappings] = useState<ClassMapping>(() => {
     const saved = localStorage.getItem(STORAGE_KEY_MAPPING);
     // Defaults are lowercase to encourage case-insensitive matching
@@ -54,8 +61,11 @@ const App: React.FC = () => {
     const normalizedUrl = url.endsWith('/') ? url : `${url}/`;
     setModelStatus('loading');
     try {
+      // Ensure library is loaded
       if (!window.tmImage) {
-        throw new Error("Teachable Machine library not loaded yet.");
+        // Simple retry mechanism if script hasn't loaded yet
+        await new Promise(resolve => setTimeout(resolve, 500));
+        if (!window.tmImage) throw new Error("Teachable Machine library not loaded yet.");
       }
       const loadedModel = await window.tmImage.load(
         `${normalizedUrl}model.json`,
@@ -64,19 +74,58 @@ const App: React.FC = () => {
       setModel(loadedModel);
       setModelLabels(loadedModel.getClassLabels());
       setModelStatus('loaded');
-      localStorage.setItem(STORAGE_KEY_URL, url);
+      setLoadedModelUrl(normalizedUrl);
+      // Note: We do NOT save to localStorage here anymore to support silent default loading
     } catch (error) {
       console.error('Failed to load model:', error);
       setModelStatus('failed');
     }
   };
 
-  // Initial load
+  // --- Initialization Effect ---
   useEffect(() => {
+    const initApp = async () => {
+      try {
+        // 1. Fetch default configuration
+        const response = await fetch('default_model.json');
+        if (!response.ok) throw new Error('Failed to load default_model.json');
+        
+        const data = await response.json();
+        // Normalize default URL immediately to match loadModel behavior
+        const defUrl = data.model_url.endsWith('/') ? data.model_url : `${data.model_url}/`;
+        const defDesc = data.model_description;
+        
+        setDefaultModelData({ url: defUrl, desc: defDesc });
+
+        // 2. Check for user-saved URL
+        const savedUrl = localStorage.getItem(STORAGE_KEY_URL);
+        
+        if (savedUrl) {
+            // If user has a saved model, populate input AND load it
+            setModelUrl(savedUrl);
+            await loadModel(savedUrl);
+        } else {
+            // If no saved model, load default BUT keep input empty (modelUrl stays '')
+            await loadModel(defUrl);
+        }
+
+      } catch (err) {
+        console.error("Initialization error:", err);
+        setModelStatus('failed');
+      }
+    };
+
+    initApp();
+  }, []);
+
+  // --- Handle Manual Load ---
+  const handleManualLoad = () => {
     if (modelUrl) {
       loadModel(modelUrl);
+      // Only save when user explicitly triggers a load
+      localStorage.setItem(STORAGE_KEY_URL, modelUrl);
     }
-  }, []);
+  };
 
   // --- Move Detection Logic ---
   useEffect(() => {
@@ -138,10 +187,7 @@ const App: React.FC = () => {
     // 1
     await new Promise(r => setTimeout(r, 800));
     
-    // CRITICAL FIX: Read from ref to get the move happening *right now*,
-    // not the move from when the function started 3 seconds ago.
     const finalHumanMove = detectedMoveRef.current;
-    
     const finalRobotMove = Math.floor(Math.random() * 3) as Move;
 
     let resultMsg = '';
@@ -193,15 +239,32 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-4 flex flex-col gap-6">
+    <div className="max-w-6xl mx-auto p-4 flex flex-col gap-6 relative">
+      
+      {/* LOADING POPUP */}
+      {modelStatus === 'loading' && (
+        <div className="fixed inset-0 z-[100] bg-slate-900/95 backdrop-blur-md flex flex-col items-center justify-center animate-in fade-in duration-300">
+          <div className="relative">
+            <div className="w-24 h-24 border-8 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+            <div className="absolute inset-0 flex items-center justify-center text-3xl">🤖</div>
+          </div>
+          <h2 className="mt-8 text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 tracking-tighter animate-pulse">
+            GETTING READY...
+          </h2>
+          <p className="mt-4 text-slate-400 font-medium">Loading AI Model</p>
+        </div>
+      )}
+
       <Header 
         modelUrl={modelUrl}
+        loadedModelUrl={loadedModelUrl}
         onUrlChange={setModelUrl}
-        onLoadModel={() => loadModel(modelUrl)}
+        onLoadModel={handleManualLoad}
         status={modelStatus}
         mappings={mappings}
         onSaveMappings={saveMappings}
         modelLabels={modelLabels}
+        defaultModelData={defaultModelData}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -4,22 +4,26 @@ import { ClassMapping } from '../types';
 
 interface HeaderProps {
   modelUrl: string;
+  loadedModelUrl: string;
   onUrlChange: (url: string) => void;
   onLoadModel: () => void;
   status: 'idle' | 'loading' | 'loaded' | 'failed';
   mappings: ClassMapping;
   onSaveMappings: (mappings: ClassMapping) => void;
   modelLabels: string[];
+  defaultModelData: { url: string; desc: string } | null;
 }
 
 export const Header: React.FC<HeaderProps> = ({
   modelUrl,
+  loadedModelUrl,
   onUrlChange,
   onLoadModel,
   status,
   mappings,
   onSaveMappings,
-  modelLabels
+  modelLabels,
+  defaultModelData
 }) => {
   const [localMappings, setLocalMappings] = useState<ClassMapping>(mappings);
   const [saveStatus, setSaveStatus] = useState<string>('');
@@ -37,12 +41,40 @@ export const Header: React.FC<HeaderProps> = ({
     setIsExpanded(false);
   };
 
+  // Determine if currently loaded model is the default one
+  // We compare the actual loaded URL, not the text input
+  const isDefaultModel = defaultModelData && loadedModelUrl === defaultModelData.url;
+
   return (
     <header className="bg-slate-800 border border-slate-700 rounded-2xl p-6 shadow-2xl space-y-6">
-      <div className="border-b border-slate-700 pb-4">
+      <div className="border-b border-slate-700 pb-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <h1 className="text-3xl font-extrabold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
           AI Rock Paper Scissors
         </h1>
+        
+        {/* Model Indicator Badge */}
+        {status === 'loaded' && (
+          <div className={`px-4 py-2 rounded-lg border text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-2 ${
+            isDefaultModel 
+              ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' 
+              : 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+          }`}>
+            {isDefaultModel ? (
+              <>
+                <span className="text-lg">✨</span>
+                <span className="flex flex-col">
+                  <span>Using Default Model</span>
+                  <span className="normal-case opacity-75 font-medium text-[10px]">{defaultModelData?.desc}</span>
+                </span>
+              </>
+            ) : (
+              <>
+                <span className="text-lg">🛠️</span>
+                <span>Using Custom Model</span>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
