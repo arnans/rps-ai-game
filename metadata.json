@@ -1,0 +1,7 @@
+{
+  "name": "RPS Game - Teachable Machine",
+  "description": "A Rock Paper Scissors game that uses your webcam and a Google Teachable Machine model to detect your moves.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
