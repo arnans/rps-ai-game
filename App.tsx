@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { GameBoard } from './components/GameBoard';
@@ -95,7 +94,8 @@ const App: React.FC = () => {
         const data = await response.json();
         
         // Normalize default URL immediately to match loadModel behavior
-        const defUrl = data.model_url.endsWith('/') ? data.model_url : `${data.model_url}/`;
+        const rawDefUrl = data.model_url;
+        const defUrl = rawDefUrl.endsWith('/') ? rawDefUrl : `${rawDefUrl}/`;
         const defDesc = data.model_description;
         
         setDefaultModelData({ url: defUrl, desc: defDesc });
@@ -103,12 +103,18 @@ const App: React.FC = () => {
         // 2. Check for user-saved URL
         const savedUrl = localStorage.getItem(STORAGE_KEY_URL);
         
-        if (savedUrl) {
-            // If user has a saved model, populate input AND load it
+        // Check if saved URL is effectively the same as default (ignore trailing slash diffs)
+        const isSavedSameAsDefault = savedUrl && (
+          (savedUrl.endsWith('/') ? savedUrl : `${savedUrl}/`) === defUrl
+        );
+        
+        if (savedUrl && !isSavedSameAsDefault) {
+            // If user has a CUSTOM saved model, populate input AND load it
             setModelUrl(savedUrl);
             await loadModel(savedUrl);
         } else {
-            // If no saved model, load default BUT keep input empty (modelUrl stays '')
+            // If no saved model OR saved model is just the default one:
+            // Load default BUT keep input empty (modelUrl stays '') to show placeholder
             await loadModel(defUrl);
         }
 
