@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { GameState, Move } from '../types';
+import { GameState } from '../types';
 import { MOVE_EMOJIS, MOVE_NAMES } from '../constants';
 
 interface GameBoardProps {
